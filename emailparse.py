@@ -72,22 +72,53 @@ def find_files_by_extensions(directory, extensions):
     return found_files
 
 def extract_domains_from_email_lists(email_data):
-    domain_list = []
-    for field in ['to', 'from']:  # Проходим по полям 'to' и 'from'
-        if field in email_data:
-            for email in email_data[field]:
-                domain = email.split('@')[-1]
-                domain_list.append(domain)
+    domains = {}
+    to_domain_list = []
+    if 'from' in email_data:
+        from_domain = email_data['from'][-1].split('@')[-1]
+    else: 
+        from_domain = ""
 
-    return domain_list
+    if 'to' in email_data:
+        for email in email_data['to']:
+            domain = email.split('@')[-1]
+            to_domain_list.append(domain)
+    else:
+        to_domain_list = ""
+
+    domains = {'from': from_domain, 'to': to_domain_list}
+    return domains
+
+def split_and_deduplicate_domains(json_data_list):
+
+    unique_data = set()  
+
+    for data in json_data_list:
+        if isinstance(data['to'], list):
+            for to_domain in data['to']:
+                new_data = {'from': data['from'], 'to': to_domain}
+                unique_data.add(tuple(sorted(new_data.items())))  
+        else:
+            unique_data.add(tuple(sorted(data.items())))
+
+    result = []
+    for from_to_pair in unique_data:
+        result.append(dict(from_to_pair))
+
+    return result
 
 
 if __name__ == '__main__':
     path = input("Введите путь к файлам: ")
     emails =  find_files_by_extensions(path, ["eml", "txt"])
+    pairs = []
     for email in emails:
         addresses = email_parse(email)
         domains = extract_domains_from_email_lists(addresses)
-        print (domains)
+        pairs.append(domains)
+
+    clear_list = split_and_deduplicate_domains(pairs)
+    for pair in clear_list:
+        print(pair)
 
  
