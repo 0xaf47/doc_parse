@@ -74,8 +74,9 @@ def find_files_by_extensions(directory, extensions):
 def extract_domains_from_email_lists(email_data):
     domains = {}
     to_domain_list = []
-    if 'from' in email_data:
-        from_domain = email_data['from'][-1].split('@')[-1]
+    print(email_data['from'])
+    if 'from' in email_data and email_data['from'] != '':
+        from_domain = email_data['from'][0].split('@')[-1]
     else: 
         from_domain = ""
 
@@ -108,6 +109,29 @@ def split_and_deduplicate_domains(json_data_list):
     return result
 
 
+def categorize_domains(json_data_list):
+
+    public_email_services = {'mail.ru', 'gmail.com', 'yandex.ru', 'rambler.ru', 'inbox.ru', 'bk.ru', 'ya.ru', 'list.ru'} 
+    public_public = []
+    public_private = []
+    private_private = []
+
+    for data in json_data_list:
+        from_domain = data['from']
+        to_domain = data['to']
+
+        is_from_public = from_domain in public_email_services
+        is_to_public = to_domain in public_email_services
+
+        if is_from_public and is_to_public:
+            public_public.append(data)
+        elif is_from_public or is_to_public:
+            public_private.append(data)
+        else:
+            private_private.append(data)
+
+    return public_public, public_private, private_private
+
 if __name__ == '__main__':
     path = input("Введите путь к файлам: ")
     emails =  find_files_by_extensions(path, ["eml", "txt"])
@@ -118,7 +142,19 @@ if __name__ == '__main__':
         pairs.append(domains)
 
     clear_list = split_and_deduplicate_domains(pairs)
-    for pair in clear_list:
-        print(pair)
+
+    public_public, public_private, private_private = categorize_domains(clear_list)
+
+    print("Public-Public:")
+    for item in public_public:
+        print(item)
+
+    print("\nPublic-Private:")
+    for item in public_private:
+        print(item)
+
+    print("\nPrivate-Private:")
+    for item in private_private:
+        print(item) 
 
  
