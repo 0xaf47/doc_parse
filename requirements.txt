@@ -1,0 +1,13 @@
+PyPDF2
+python-docx
+openpyxl
+pytesseract
+Pillow
+olefile
+email-validator
+pypff
+beautifulsoup4
+pandas
+rarfile
+stdnum
+
