@@ -489,7 +489,11 @@ def pst_parse(pst_file_path):
             for message in sub.sub_messages:
 
                 headers = message.transport_headers
-                raw_body = message.get_html_body()
+                raw_body = None #патч ошибки commit  pst_parse error
+                try:
+                    raw_body = message.get_html_body()
+                except:
+                    pass
                 if raw_body is not None:
                     # print("stststs" + str(headers))
                     # print(raw_body)
