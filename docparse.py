@@ -590,8 +590,12 @@ if __name__ == "__main__":
     if args.mode == "sensitive_data":
         for file in files['pdf']:
             text = extract_text_from_pdf(file)
-            sensitive_data = sensitive_data_finder(text)
-            results[file] = sensitive_data
+            if text != None:  #patch for commit None text fixed
+                try:
+                    sensitive_data = sensitive_data_finder(text)
+                    results[file] = sensitive_data
+                except:
+                    pass
 
         for file in files['excel']:
             text = extract_text_from_excel(file)
