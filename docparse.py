@@ -455,15 +455,19 @@ def extract_from_emails(files):
     for file in files:
         _, file_extension = os.path.splitext(file)
         if file_extension.lower() == '.txt':
-            txt_parse = txt_email_parse(file) #patch for None return by Except in txt_email_parse
-            iftxt_parse != None:              
-                pairs.extend(txt_parse)
+            txt_parse_pairs = txt_email_parse(file) #patch for None return by Except in txt_email_parse
+            if txt_parse_pairs != None:              
+                pairs.extend(txt_parse_pairs)
 
         if file_extension.lower() == '.eml':
-            pairs.extend(eml_parse(file))
+            eml_parse_pairs = eml_parse(file)
+            if eml_parse_pairs != None:
+                pairs.extend(eml_parse_pairs)
 
-        elif file_extension.lower() == '.pst':
-            pairs.extend(pst_parse(file))
+        if file_extension.lower() == '.pst':
+            pst_parse_pairs = pst_parse(file)
+            if pst_parse_pairs
+                pairs.extend(pst_parse_pairs)
 
         else:
             continue
