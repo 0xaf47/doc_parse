@@ -317,8 +317,11 @@ def eml_parse(file_path):
         return [addr[0] or addr[1] for addr in addresses]
 
     # Извлекаем только адреса
-    sender_address = extract_addresses(sender)[0]  # Предполагаем, что sender всегда один
-    recipient_addresses = extract_addresses(recipients)
+    try:
+        sender_address = extract_addresses(sender)[0]  # Предполагаем, что sender всегда один
+        recipient_addresses = extract_addresses(recipients)
+    except:
+        return None
 
     # Формируем список JSON-объектов
     result = []
