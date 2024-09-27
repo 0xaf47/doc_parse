@@ -466,7 +466,7 @@ def extract_from_emails(files):
 
         if file_extension.lower() == '.pst':
             pst_parse_pairs = pst_parse(file)
-            if pst_parse_pairs
+            if pst_parse_pairs != None:
                 pairs.extend(pst_parse_pairs)
 
         else:
