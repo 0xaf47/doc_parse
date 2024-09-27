@@ -301,23 +301,34 @@ def extract_email_address(header):
     return match.group(0) if match else None
 
 
-def eml_parse(file):
-    try:
-        with open(file, 'rb') as fp:
-            msg = BytesParser(policy=policy.default).parse(fp)
+def eml_parse(file_path):
+    # Открываем файл .eml
+    with open(file_path, 'rb') as file:
+        # Парсим содержимое файла
+        msg = BytesParser(policy=policy.default).parse(file)
 
-            return {
-                'to': extract_email_address(msg['to']),
-                'from': extract_email_address(msg['from'])
-            }
-    except BaseException:
-        return {
-            'to': [],
-            'from': []
-        }
+    # Извлекаем адрес отправителя и получателей
+    sender = msg['From']
+    recipients = msg['To']
 
-# Можно еще Subject и прочее
+    # Функция для извлечения адресов из строки
+    def extract_addresses(field):
+        addresses = re.findall(r'<(.+?)>|([\w\.-]+@[\w\.-]+)', field)
+        return [addr[0] or addr[1] for addr in addresses]
 
+    # Извлекаем только адреса
+    sender_address = extract_addresses(sender)[0]  # Предполагаем, что sender всегда один
+    recipient_addresses = extract_addresses(recipients)
+
+    # Формируем список JSON-объектов
+    result = []
+    for recipient in recipient_addresses:
+        result.append({
+            'to': recipient,
+            'from': sender_address
+        })
+
+    return result
 
 def txt_email_parse(file):
     try:
@@ -348,17 +359,16 @@ def txt_email_parse(file):
                     r',\s*|\s*;\s*',
                     match) if email]
             from_addresses.extend(addresses)
-
-        return {
-            'to': to_addresses,
-            'from': from_addresses
-        }
     except BaseException:
-        return {
-            'to': [],
-            'from': []
-        }
+        return None
+    result = []
+    for to_address in to_addresses:
+        result.append({
+            'to': to_address,
+            'from': from_addresses[0]
+        })
 
+    return result
 
 def split_and_deduplicate_domains(json_data_list):
 
@@ -375,6 +385,7 @@ def split_and_deduplicate_domains(json_data_list):
     result = []
     for from_to_pair in unique_data:
         result.append(dict(from_to_pair))
+        print(from_to_pair)
 
     return result
 
@@ -418,34 +429,46 @@ def categorize_domains(json_data_list):
 
 def extract_from_emails(files):
     pairs = []
+    def extract_domains(emails_list):
+        result_list = []
+        for email_dict in emails_list:
+            new_dict = {}
+            valid_email_found = False
+            for key, value in email_dict.items():
+                match = re.search(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", value)
+                if match:
+                    email = match.group(1)
+                    domain_match = re.search(r"@(.*)", email)  
+                    if domain_match:
+                        domain = domain_match.group(1)
+                        new_dict[key] = domain.lower()
+                        valid_email_found = True
+                    else:
+                        valid_email_found = False 
+                else:
+                    valid_email_found = False
+            if valid_email_found:
+                result_list.append(new_dict)
+
+        return result_list
+
     for file in files:
         _, file_extension = os.path.splitext(file)
         if file_extension.lower() == '.txt':
-            addresses = txt_email_parse(file)
-            pairs.append(addresses)
+            txt_parse = txt_email_parse(file) #patch for None return by Except in txt_email_parse
+            iftxt_parse != None:              
+                pairs.extend(txt_parse)
 
-        elif file_extension.lower() == '.eml':
-            addresses = eml_parse(file)
-            pairs.append(addresses)
+        if file_extension.lower() == '.eml':
+            pairs.extend(eml_parse(file))
 
         elif file_extension.lower() == '.pst':
-            addresses_pairs = pst_parse(file)
-            for pair in addresses_pairs:
-                pairs.append(pair)
+            pairs.extend(pst_parse(file))
+
         else:
             continue
-    for pair in pairs:
-        if 'from' in pair and pair['from'] != '':
-            try:
-                pair['from'] = ''.join(pair['from']).split('@')[1]
-            except BaseException:
-                pass
-
-        if 'to' in pair and pair['to'] != '':
-            try:
-                pair['to'] = ''.join(pair['to']).split('@')[1]
-            except BaseException:
-                pass
+    print (pairs)
+    pairs = extract_domains(pairs)
 
     clear_list = split_and_deduplicate_domains(pairs)
     clear_domains = categorize_domains(clear_list)
@@ -478,6 +501,24 @@ def export_json_to_csv(mode, json_data, csv_file_path):
 
 
 def pst_parse(pst_file_path):
+    def extract_addresses(text):
+
+        from_match = re.search(r"From: ([^<]+<([^>]*)>)", text)
+        to_match = re.findall(r"To: ([^<]+<([^>]*)>)", text)
+
+        addresses = []
+
+        if from_match:
+            from_address = from_match.group(2)
+
+            for to_address in [match[1] for match in to_match]:
+                addresses.append({
+                    "from": from_address,
+                    "to": to_address
+                })
+
+        return addresses
+
     addresses = []
     pst_file = pypff.file()
     pst_file.open(pst_file_path)
@@ -489,11 +530,7 @@ def pst_parse(pst_file_path):
             for message in sub.sub_messages:
 
                 headers = message.transport_headers
-                raw_body = None #патч ошибки commit  pst_parse error
-                try:
-                    raw_body = message.get_html_body()
-                except:
-                    pass
+                raw_body = message.get_html_body()
                 if raw_body is not None:
                     # print("stststs" + str(headers))
                     # print(raw_body)
@@ -506,25 +543,6 @@ def pst_parse(pst_file_path):
                     soup = BeautifulSoup(raw_body, "lxml")
                     plain_text = soup.get_text()
                     addresses.extend(extract_addresses(plain_text))
-
-    return addresses
-
-
-def extract_addresses(text):
-
-    from_match = re.search(r"From: ([^<]+<([^>]*)>)", text)
-    to_match = re.findall(r"To: ([^<]+<([^>]*)>)", text)
-
-    addresses = []
-
-    if from_match:
-        from_address = from_match.group(2)
-
-        for to_address in [match[1] for match in to_match]:
-            addresses.append({
-                "from": from_address,
-                "to": to_address
-            })
 
     return addresses
 
@@ -578,9 +596,9 @@ if __name__ == "__main__":
                         help='Mode of operation: "emails" (search for From-To emails and domains in addresses) or "sensitive_data" (search for phones, names etc)')
     args = parser.parse_args()
     path = args.input_path
-    archives = find_files_by_extensions(
-        path, {'archive': extensions['archive']})
-    process_archives(archives, extensions, path)
+#   archives = find_files_by_extensions(
+#   path, {'archive': extensions['archive']})
+#   process_archives(archives, extensions, path)
     files = find_files_by_extensions(path, extensions)
     results = {}
 
@@ -590,12 +608,8 @@ if __name__ == "__main__":
     if args.mode == "sensitive_data":
         for file in files['pdf']:
             text = extract_text_from_pdf(file)
-            if text != None:  #patch for commit None text fixed
-                try:
-                    sensitive_data = sensitive_data_finder(text)
-                    results[file] = sensitive_data
-                except:
-                    pass
+            sensitive_data = sensitive_data_finder(text)
+            results[file] = sensitive_data
 
         for file in files['excel']:
             text = extract_text_from_excel(file)
