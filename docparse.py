@@ -455,7 +455,6 @@ def extract_from_emails(files):
     for file in files:
         _, file_extension = os.path.splitext(file)
         if file_extension.lower() == '.txt':
-
             txt_parse = txt_email_parse(file) #patch for None return by Except in txt_email_parse
             if txt_parse != None:              
                 pairs.extend(txt_parse)
