@@ -549,7 +549,10 @@ def pst_parse(pst_file_path):
                         # print(raw_body)
                     soup = BeautifulSoup(raw_body, "lxml")
                     plain_text = soup.get_text()
-                    addresses.extend(extract_addresses(plain_text))
+                    try:
+                        addresses.extend(extract_addresses(plain_text))
+                    except:
+                        continue
 
     return addresses
 
