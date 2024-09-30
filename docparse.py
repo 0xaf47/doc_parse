@@ -21,7 +21,7 @@ import validator
 import subprocess
 import zipfile
 import rarfile
-
+import datetime
 
 def extract_text_from_pdf(pdf_path):
 
@@ -373,7 +373,7 @@ def txt_email_parse(file):
 
     return result
 
-def split_and_deduplicate_domains(json_data_list):
+def split_and_deduplicate_domains_old(json_data_list):
 
     unique_data = set()
 
@@ -391,6 +391,40 @@ def split_and_deduplicate_domains(json_data_list):
         print(from_to_pair)
 
     return result
+
+
+def split_and_deduplicate_domains_bad(data):
+    unique_domains = {}
+    
+    for entry in data:
+        from_domain = entry['from']
+        to_domain = entry['to']
+        
+        # Проверяем наличие ключа 'unixtime'
+        if 'unixtime' in entry:
+            if from_domain not in unique_domains or entry['unixtime'] > unique_domains[from_domain]['unixtime']:
+                unique_domains[from_domain] = entry
+            if to_domain not in unique_domains or entry['unixtime'] > unique_domains[to_domain]['unixtime']:
+                unique_domains[to_domain] = entry
+
+    # Возвращаем только уникальные значения
+    return list(unique_domains.values())
+
+def split_and_deduplicate_domains(json_list):
+    unique_pairs = {}
+    
+    for item in json_list:
+        key = (item['from'], item['to'])
+        # Проверяем наличие ключа 'unixtime' и обновляем, если он больше
+        if key not in unique_pairs:
+            unique_pairs[key] = item
+        else:
+            existing_item = unique_pairs[key]
+            if 'unixtime' in item and ('unixtime' not in existing_item or item['unixtime'] > existing_item['unixtime']):
+                unique_pairs[key] = item
+
+    return list(unique_pairs.values())
+
 
 
 def categorize_domains(json_data_list):
@@ -427,6 +461,7 @@ def categorize_domains(json_data_list):
                'public_private': public_private,
                'private_private': private_private
                }
+
     return domains
 
 
@@ -438,6 +473,9 @@ def extract_from_emails(files):
             new_dict = {}
             valid_email_found = False
             for key, value in email_dict.items():
+                if key == "unixtime":
+                    new_dict['unixtime'] = value
+                    continue
                 match = re.search(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", value)
                 if match:
                     email = match.group(1)
@@ -474,7 +512,7 @@ def extract_from_emails(files):
 
         else:
             continue
-    print (pairs)
+
     pairs = extract_domains(pairs)
 
     clear_list = split_and_deduplicate_domains(pairs)
@@ -501,7 +539,10 @@ def export_json_to_csv(mode, json_data, csv_file_path):
         rows = []
         for key in json_data:
             for entry in json_data[key]:
-                row = {'type': key, 'from': entry['from'], 'to': entry['to']}
+                if 'unixtime' in entry:
+                    row = {'type': key, 'from': entry['from'], 'to': entry['to'], 'unixtime':entry['unixtime']}
+                else:
+                    row = {'type': key, 'from': entry['from'], 'to': entry['to']}
                 rows.append(row)
         df = pd.DataFrame(rows)
         df.to_csv(csv_file_path, index=False)
@@ -509,20 +550,35 @@ def export_json_to_csv(mode, json_data, csv_file_path):
 
 def pst_parse(pst_file_path):
     def extract_addresses(text):
-
         from_match = re.search(r"From: ([^<]+<([^>]*)>)", text)
         to_match = re.findall(r"To: ([^<]+<([^>]*)>)", text)
+        date_string = re.search(r'Sent:\s*(.*?\d{1,2}:\d{2}\s*[AP]M)', text).group(1)
+        print(date_string)
+        try:
+            date_obj = datetime.datetime.strptime(date_string, '%A, %B %d, %Y %I:%M %p')
+        except Exception as e:
+            print(f"Ошибка при конвертации даты {e}")
+
+        unixtime = int(date_obj.timestamp())
 
         addresses = []
 
         if from_match:
             from_address = from_match.group(2)
+            if 'unixtime' != None:
+                for to_address in [match[1] for match in to_match]:
+                    addresses.append({
+                        "from": from_address,
+                        "to": to_address,
+                        "unixtime": unixtime
+                    })
 
-            for to_address in [match[1] for match in to_match]:
-                addresses.append({
-                    "from": from_address,
-                    "to": to_address
-                })
+            else:
+                for to_address in [match[1] for match in to_match]:
+                    addresses.append({
+                        "from": from_address,
+                        "to": to_address,
+                    })
 
         return addresses
 
