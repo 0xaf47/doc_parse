@@ -694,7 +694,7 @@ if __name__ == "__main__":
             print("File num " + str(files['word'].index(file)) + "/" + str(number_of_files))
             text = run_with_timeout(lambda: extract_text_from_word(file), 1)
             if text != None:
-                sensitive_data = sensitive_data_finder(text)
+                sensitive_data = run_with_timeout(lambda: sensitive_data_finder(text), 1)
                 if sensitive_data != None:
                     results[file] = sensitive_data
             else:
