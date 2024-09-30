@@ -22,6 +22,8 @@ import subprocess
 import zipfile
 import rarfile
 import datetime
+import signal
+import time
 
 def extract_text_from_pdf(pdf_path):
 
@@ -712,7 +714,6 @@ if __name__ == "__main__":
                 problem_files.append(file)
                 continue
         export_json_to_csv(args.mode, results, csv_file_path, "a")
-
         results = {}
 
         for file in files['pdf']:
@@ -726,7 +727,7 @@ if __name__ == "__main__":
                 problem_files.append(file)
                 continue
         export_json_to_csv(args.mode, results, csv_file_path, 'a')
-
+        print(problem_files)
 
 
 
