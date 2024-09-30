@@ -112,21 +112,21 @@ def extract_text_from_doc(file_path):
 def extract_text_from_word(file_path: str) -> str:
     """Извлекает текст из .docx файла."""
     _, ext = os.path.splitext(file_path)
-
+    ext = ext.lower()
     if ext == '.docx':
         # Обработка .docx файлов
         try:
             doc = Document(file_path)
             return '\n'.join([para.text for para in doc.paragraphs])
         except BaseException:
-            return ''
+            return None
 
     elif ext == '.doc':
         # Обработка .doc файлов
         try:
             return extract_text_from_doc(file_path)
         except BaseException:
-            return ''
+            return None
 
     elif ext == '.txt':
         # Обработка .txt файлов
@@ -134,11 +134,7 @@ def extract_text_from_word(file_path: str) -> str:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read().strip()
         except BaseException:
-            return ''
-
-    else:
-        raise ValueError(f"Unsupported file extension: {ext}")
-
+            return None
 
 def extract_text_from_excel(file_path: str) -> str:
     _, file_extension = os.path.splitext(file)
@@ -520,12 +516,12 @@ def extract_from_emails(files):
     return clear_domains
 
 
-def export_json_to_csv(mode, json_data, csv_file_path):
+def export_json_to_csv(mode, json_data, csv_file_path, write_mode='w'):
     if mode == 'sensitive_data':
         # Получаем заголовки из первого элемента JSON
         headers = ['file'] + list(next(iter(json_data.values())).keys())
 
-        with open(csv_file_path, 'w', newline='', encoding='utf-8') as csv_file:
+        with open(csv_file_path, write_mode, newline='', encoding='utf-8') as csv_file:
             writer = csv.writer(csv_file)
 
             # Записываем заголовки
@@ -647,6 +643,19 @@ def process_archives(archives, extensions, path):
 
     return result
 
+def handler(signum, frame):
+    raise TimeoutError("Time's up!")
+
+def run_with_timeout(func, timeout_seconds):
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(timeout_seconds)
+    try:
+        return func()  # Возвращаем результат функции
+    except TimeoutError:
+        print("Operation timed out!")
+        return None  # Возвращаем None в случае таймаута
+    finally:
+        signal.alarm(0)
 
 if __name__ == "__main__":
     extensions = {"word": ["txt", "docx", "doc"],
@@ -671,25 +680,55 @@ if __name__ == "__main__":
 #   process_archives(archives, extensions, path)
     files = find_files_by_extensions(path, extensions)
     results = {}
+    problem_files = []
+    csv_file_path = 'output1.csv'
 
     if args.mode == "emails":
         results = extract_from_emails(files['email'])
 
     if args.mode == "sensitive_data":
-        for file in files['pdf']:
-            text = extract_text_from_pdf(file)
-            sensitive_data = sensitive_data_finder(text)
-            results[file] = sensitive_data
+        number_of_files = len(files['word'])
+        for file in files['word']:
+            print("File num " + str(files['word'].index(file)) + "/" + str(number_of_files))
+            text = run_with_timeout(lambda: extract_text_from_word(file), 1)
+            if text != None:
+                sensitive_data = sensitive_data_finder(text)
+                if sensitive_data != None:
+                    results[file] = sensitive_data
+            else:
+                problem_files.append(file)
+                continue
+        export_json_to_csv(args.mode, results, csv_file_path)
+        results = {}
 
         for file in files['excel']:
-            text = extract_text_from_excel(file)
-            sensitive_data = sensitive_data_finder(text)
-            results[file] = sensitive_data
+            print("File num " + str(files['excel'].index(file)) + "/" + str(number_of_files))
+            text = run_with_timeout(lambda: extract_text_from_pdf(file), 1)
+            if text != None:
+                sensitive_data = run_with_timeout(lambda: sensitive_data_finder(text), 1)
+                if sensitive_data != None:
+                    results[file] = sensitive_data
+            else:
+                problem_files.append(file)
+                continue
+        export_json_to_csv(args.mode, results, csv_file_path, "a")
 
-        for file in files['word']:
-            text = extract_text_from_word(file)
-            sensitive_data = sensitive_data_finder(text)
-            results[file] = sensitive_data
+        results = {}
+
+        for file in files['pdf']:
+            print("File num " + str(files['pdf'].index(file)) + "/" + str(number_of_files))
+            text = run_with_timeout(lambda: extract_text_from_pdf(file), 1)
+            if text != None:
+                sensitive_data = run_with_timeout(lambda: sensitive_data_finder(text), 1)
+                if sensitive_data != None:
+                    results[file] = sensitive_data
+            else:
+                problem_files.append(file)
+                continue
+        export_json_to_csv(args.mode, results, csv_file_path, 'a')
+
+
+
 
     csv_file_path = 'output1.csv'
     export_json_to_csv(args.mode, results, csv_file_path)
