@@ -591,9 +591,13 @@ def pst_parse(pst_file_path):
     for folder in root.sub_folders:
         for sub in folder.sub_folders:
             for message in sub.sub_messages:
-
-                headers = message.transport_headers
-                raw_body = message.get_html_body()
+                try:
+                    headers = message.transport_headers
+                    raw_body = message.get_html_body()
+                except Exception as e:
+                    print(f"Ошибка при получении тела письма {e}")
+                    raw_body = None
+                    continue
                 if raw_body is not None:
                     # print("stststs" + str(headers))
                     # print(raw_body)
