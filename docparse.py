@@ -705,7 +705,7 @@ if __name__ == "__main__":
 
         for file in files['excel']:
             print("File num " + str(files['excel'].index(file)) + "/" + str(number_of_files))
-            text = run_with_timeout(lambda: extract_text_from_pdf(file), 1)
+            text = run_with_timeout(lambda: extract_text_from_excel(file), 1)
             if text != None:
                 sensitive_data = run_with_timeout(lambda: sensitive_data_finder(text), 1)
                 if sensitive_data != None:
