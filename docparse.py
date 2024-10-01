@@ -42,7 +42,7 @@ def extract_text_from_pdf(pdf_path):
                     if page_text:
                         text += page_text
                 except BaseException:
-                    text = ''
+                    text = None
                     pass
 
             # Проверяем, есть ли извлеченный текст
@@ -165,7 +165,6 @@ def extract_text_from_excel(file_path: str) -> str:
         print("converting to " + file_path)
 
     try:
-        print("working on xlsx")
         wb = load_workbook(filename=file_path)
         sheet = wb.active
         text = []
@@ -370,43 +369,6 @@ def txt_email_parse(file):
         })
 
     return result
-
-def split_and_deduplicate_domains_old(json_data_list):
-
-    unique_data = set()
-
-    for data in json_data_list:
-        if isinstance(data['to'], list):
-            for to_domain in data['to']:
-                new_data = {'from': data['from'], 'to': to_domain}
-                unique_data.add(tuple(sorted(new_data.items())))
-        else:
-            unique_data.add(tuple(sorted(data.items())))
-
-    result = []
-    for from_to_pair in unique_data:
-        result.append(dict(from_to_pair))
-        print(from_to_pair)
-
-    return result
-
-
-def split_and_deduplicate_domains_bad(data):
-    unique_domains = {}
-    
-    for entry in data:
-        from_domain = entry['from']
-        to_domain = entry['to']
-        
-        # Проверяем наличие ключа 'unixtime'
-        if 'unixtime' in entry:
-            if from_domain not in unique_domains or entry['unixtime'] > unique_domains[from_domain]['unixtime']:
-                unique_domains[from_domain] = entry
-            if to_domain not in unique_domains or entry['unixtime'] > unique_domains[to_domain]['unixtime']:
-                unique_domains[to_domain] = entry
-
-    # Возвращаем только уникальные значения
-    return list(unique_domains.values())
 
 def split_and_deduplicate_domains(json_list):
     unique_pairs = {}
@@ -702,7 +664,7 @@ if __name__ == "__main__":
                 continue
         export_json_to_csv(args.mode, results, csv_file_path)
         results = {}
-
+        number_of_files = len(files['excel'])
         for file in files['excel']:
             print("File num " + str(files['excel'].index(file)) + "/" + str(number_of_files))
             text = run_with_timeout(lambda: extract_text_from_excel(file), 1)
@@ -715,7 +677,7 @@ if __name__ == "__main__":
                 continue
         export_json_to_csv(args.mode, results, csv_file_path, "a")
         results = {}
-
+        number_of_files = len(files['pdf'])
         for file in files['pdf']:
             print("File num " + str(files['pdf'].index(file)) + "/" + str(number_of_files))
             text = run_with_timeout(lambda: extract_text_from_pdf(file), 1)
@@ -726,6 +688,7 @@ if __name__ == "__main__":
             else:
                 problem_files.append(file)
                 continue
+
         export_json_to_csv(args.mode, results, csv_file_path, 'a')
         print(problem_files)
 
